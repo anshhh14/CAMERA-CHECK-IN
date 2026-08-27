@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>Door Check-In</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --bg:#0B0B10;
@@ -328,6 +329,7 @@
     <button class="tab active" data-tab="log">Checked in</button>
     <button class="tab" data-tab="flags">Flags</button>
     <button class="tab" data-tab="pending">Not arrived</button>
+    <button class="tab" data-tab="add">+ Add guest</button>
   </div>
 
   <div class="panel active" id="panel-log">
@@ -343,6 +345,22 @@
     <div id="pendingList"></div>
   </div>
 
+  <div class="panel" id="panel-add">
+    <div class="add-form">
+      <input class="search-box" id="newName" placeholder="Full name (required)" />
+      <input class="search-box" id="newCourse" placeholder="Course / group (optional)" />
+      <input class="search-box" id="newAlias" placeholder="Alias / nickname (optional)" />
+      <input class="search-box" id="newCode" placeholder="Existing code (optional — leave blank to auto-generate)" style="font-family:var(--mono); text-transform:uppercase;" />
+      <button class="primary-btn" id="addGuestBtn" style="width:100%;margin-top:4px;">Add guest &amp; generate QR</button>
+    </div>
+    <div id="newGuestResult" style="display:none; margin-top:18px; text-align:center;">
+      <div class="r-title" style="margin-bottom:10px;" id="newGuestName"></div>
+      <div id="qrCanvasHolder" style="display:inline-block; background:#fff; padding:14px; border-radius:14px;"></div>
+      <div class="log-meta" style="margin:10px 0;">Code: <span id="newGuestCode" style="font-family:var(--mono); color:var(--text);"></span></div>
+      <button class="primary-btn" id="downloadQrBtn">Download QR</button>
+    </div>
+  </div>
+
   <div class="export-row">
     <button class="primary" id="exportBtn">Export check-ins (CSV)</button>
     <button id="resetBtn">Reset event</button>
@@ -352,19 +370,42 @@
 </div>
 
 <script>
-const PARTICIPANTS = [{"name": "Prakhar Sharan", "code": "A2875B6A", "course": "B.COM(HONS)", "alias": "", "phone": "9140343403"}, {"name": "Arush Pal", "code": "01721666", "course": "B.com", "alias": "", "phone": "8423619921"}, {"name": "Ridhima Kashyap", "code": "A2810000", "course": "Bcom nep regular", "alias": "Hello", "phone": "8317085593"}, {"name": "Shreya Dubey", "code": "E8977D98", "course": "B.com e-commerce Lucknow University", "alias": "", "phone": "9936698715"}, {"name": "Kaji md sadik", "code": "DAD3FD98", "course": "B.com Nep SF", "alias": "", "phone": "7266844108"}, {"name": "PRAKHAR YADAV", "code": "E60FDA0F", "course": "B.com old campus", "alias": "", "phone": "9140160765"}, {"name": "Mohit singh sisaudiya", "code": "A7D7051B", "course": "B.com nep", "alias": "", "phone": "+919305473465"}, {"name": "Vaibhav Kumar", "code": "6CA57A9E", "course": "Bcom hons", "alias": "", "phone": "9198574636"}, {"name": "Shreya Rao", "code": "AEAB437E", "course": "BCom hons", "alias": "Dr. Strange", "phone": "9695550425"}, {"name": "Daksh Prasad", "code": "F4687186", "course": "B.com(Hons)", "alias": "", "phone": "8545877262"}, {"name": "Janvi Yadav", "code": "2E7F8C8B", "course": "BCOM(NEP)", "alias": "", "phone": "7007761700"}, {"name": "ADARSH VERMA", "code": "ACA3F02E", "course": "Bcom", "alias": "", "phone": "+917755866540"}, {"name": "Aditya raj singh", "code": "496E9A7E", "course": "Bcom(nep)", "alias": "", "phone": "+917007708233"}, {"name": "Supriya milan", "code": "7D206DCD", "course": "Bcom", "alias": "Octohuman \ud83d\udc19", "phone": "9250680347"}, {"name": "Tvesa Verma", "code": "53416AA3", "course": "bcom nep", "alias": "Ravi kishan", "phone": "8081868948"}, {"name": "Sanskar Yadav", "code": "830C3E95", "course": "B.com (Hons)", "alias": "", "phone": "7275721063"}, {"name": "Anuj Singh Chauhan", "code": "A5DB6FB9", "course": "B. Com", "alias": "Hanuman ji", "phone": "8546072929"}, {"name": "Vishujeet Singh", "code": "748AC2D4", "course": "Bcom Hons", "alias": "", "phone": "9569628306"}, {"name": "Tanishq Seth", "code": "99899FBC", "course": "Bcom hon SF in faculty of commerce", "alias": "\ud83d\udc26\u200d\ud83d\udd25 Phoenix", "phone": "6388894148"}, {"name": "Pappu yadav", "code": "59087585", "course": "B.Fuck,Tall Branch", "alias": "Chaddha man", "phone": "9371289371"}, {"name": "Monika Singh", "code": "18224CCA", "course": "B.com(hons)", "alias": "", "phone": "8318994471"}, {"name": "Vivek singh", "code": "4454950E", "course": "BCA (AI & ML)", "alias": "", "phone": "7607454985"}, {"name": "Amrat Singh", "code": "96282EF2", "course": "Bcom hons", "alias": "Spiderman", "phone": "9335738191"}, {"name": "Sarvesh Singh", "code": "BD077FF3", "course": "Bcom h", "alias": "Babu rai", "phone": "9287460591"}, {"name": "Himanshu Gupta", "code": "15560268", "course": "B.com hons", "alias": "", "phone": "7905218848"}, {"name": "Mitesh Chand", "code": "56F5D92D", "course": "B.COM (HONS)", "alias": "", "phone": "9415534625"}, {"name": "ABHISHEK", "code": "EA26FD1B", "course": "Bcom hon", "alias": "", "phone": "+916307249207"}, {"name": "Harsh Singh", "code": "7E2A7248", "course": "Bcom Nep self finance", "alias": "Spiderman", "phone": "+917007837471"}, {"name": "SHIVAM YADAV", "code": "773180D4", "course": "B.com Old campus", "alias": "", "phone": "8957687348"}, {"name": "PRAKHAR YADAV", "code": "BF623014", "course": "B.com", "alias": "", "phone": "9140160765"}, {"name": "Aryan raj", "code": "E519E5A3", "course": "B.com(NEP)", "alias": "", "phone": "9555037774"}, {"name": "Antra Patel", "code": "19169377", "course": "Bcom", "alias": "", "phone": "+919065261172"}, {"name": "Harshita", "code": "17D70DB7", "course": "Bcom", "alias": "01", "phone": "6388036654"}, {"name": "Sanskar gupta", "code": "07D9E6F7", "course": "B.com nep", "alias": "", "phone": "8189033476"}, {"name": "Slok Gupta", "code": "3415AA86", "course": "B.com NEP self finance", "alias": "", "phone": "8090892677"}, {"name": "Shreya Singh", "code": "FB4FEA31", "course": "B.com(hons.)", "alias": "Venom", "phone": "9891855082"}, {"name": "Anshul Verma", "code": "BB7E2C17", "course": "B. Com", "alias": "", "phone": "8840578095"}, {"name": "Vyom Saral", "code": "868ED7AB", "course": "B.Com (hons)", "alias": "Miles", "phone": "9170724581"}, {"name": "Vishu Jaiswal", "code": "B6CE5964", "course": "B.con NEP", "alias": "Jadeja \u2764\ufe0f", "phone": "6386642861"}, {"name": "Anchal Verma", "code": "2B25250E", "course": "B.com", "alias": "", "phone": "9473546053"}, {"name": "Garvita Vaish", "code": "41E267AD", "course": "B.com (nep)", "alias": "", "phone": "9335901066"}, {"name": "VASU KUMAR", "code": "C81D52B9", "course": "B.com(NEP)", "alias": "Captain America", "phone": "7905201688"}, {"name": "Nishant kumar", "code": "B8EBBD51", "course": "B.com(NEP)", "alias": "", "phone": "8090380585"}, {"name": "Satya", "code": "6CB5CF84", "course": "B. Com", "alias": "Ironman", "phone": "63876363338"}, {"name": "Rishabh", "code": "09FC8AF1", "course": "Bsc", "alias": "", "phone": "9335934697"}, {"name": "Rytham Pandey", "code": "2DEF8895", "course": "Bcom hons", "alias": "Ap jante hai ! \ud83e\udd21", "phone": "+919415559154"}, {"name": "Rohit singh", "code": "6FF00E60", "course": "B.com nep", "alias": "", "phone": "8303454098"}, {"name": "Mayank", "code": "42FE6E95", "course": "B.com(hons)", "alias": "", "phone": "8922972514"}, {"name": "saniya sabbag", "code": "9C18C9B1", "course": "BCOM Hons", "alias": "", "phone": "7860959070"}, {"name": "Aditya", "code": "2FAD46BF", "course": "B.com self finance", "alias": "\ud83d\ude0e", "phone": "9451278895"}, {"name": "Anshuman Gupta", "code": "619FEAB9", "course": "B.com", "alias": "", "phone": "9936105044"}, {"name": "Krish Srivastava", "code": "BB7B808E", "course": "B.com", "alias": "", "phone": "+916394141030"}, {"name": "SHASWATO BISWAS", "code": "0BD094FB", "course": "B.Com", "alias": "Shersha", "phone": "7478120595"}, {"name": "Varun Dev Dikhit", "code": "574944F9", "course": "B.com NEP", "alias": "Michael Corleone form Godfather and Choti Master Thor", "phone": "9569-272751"}, {"name": "Ashu", "code": "D226BDCE", "course": "B.com (Retail Management)", "alias": "The Hustler\ud83d\udd25", "phone": "9897619990"}, {"name": "Ovitosh Paul", "code": "5A65D0F1", "course": "Bcom NEP", "alias": "Thor", "phone": "9519036883"}, {"name": "Nihal Jaiswal", "code": "5B63B7F8", "course": "Bcom Hons", "alias": "", "phone": "+917518436177"}, {"name": "Divyansh Vaish", "code": "154903FA", "course": "B. Com", "alias": "", "phone": "9278228929"}, {"name": "Aditi Verma", "code": "6B0D2669", "course": "B.com", "alias": "", "phone": "6307422450"}, {"name": "Ishita Sharma", "code": "A2F9FD1F", "course": "Bcom (nep)", "alias": "Idk", "phone": "7311135977"}, {"name": "Mahima yadav", "code": "B7594EA4", "course": "BCom", "alias": "", "phone": "7905994118"}, {"name": "Tanishka Gupta", "code": "049CCD80", "course": "Bcom nep S. F", "alias": "", "phone": "8468050193"}, {"name": "Devansh Yadav", "code": "597A56AA", "course": "Bcom", "alias": "", "phone": "+916388672975"}];
+const BASE_PARTICIPANTS = [{"name": "Anshu Yadav", "code": "A2875B6A", "course": "B.Tech(AI)", "alias": "", "phone": "7080454565"},{"name": "Prakhar Sharan", "code": "A2875B6A", "course": "B.COM(HONS)", "alias": "", "phone": "9140343403"}, {"name": "Arush Pal", "code": "01721666", "course": "B.com", "alias": "", "phone": "8423619921"}, {"name": "Ridhima Kashyap", "code": "A2810000", "course": "Bcom nep regular", "alias": "Hello", "phone": "8317085593"}, {"name": "Shreya Dubey", "code": "E8977D98", "course": "B.com e-commerce Lucknow University", "alias": "", "phone": "9936698715"}, {"name": "Kaji md sadik", "code": "DAD3FD98", "course": "B.com Nep SF", "alias": "", "phone": "7266844108"}, {"name": "PRAKHAR YADAV", "code": "E60FDA0F", "course": "B.com old campus", "alias": "", "phone": "9140160765"}, {"name": "Mohit singh sisaudiya", "code": "A7D7051B", "course": "B.com nep", "alias": "", "phone": "+919305473465"}, {"name": "Vaibhav Kumar", "code": "6CA57A9E", "course": "Bcom hons", "alias": "", "phone": "9198574636"}, {"name": "Shreya Rao", "code": "AEAB437E", "course": "BCom hons", "alias": "Dr. Strange", "phone": "9695550425"}, {"name": "Daksh Prasad", "code": "F4687186", "course": "B.com(Hons)", "alias": "", "phone": "8545877262"}, {"name": "Janvi Yadav", "code": "2E7F8C8B", "course": "BCOM(NEP)", "alias": "", "phone": "7007761700"}, {"name": "ADARSH VERMA", "code": "ACA3F02E", "course": "Bcom", "alias": "", "phone": "+917755866540"}, {"name": "Aditya raj singh", "code": "496E9A7E", "course": "Bcom(nep)", "alias": "", "phone": "+917007708233"}, {"name": "Supriya milan", "code": "7D206DCD", "course": "Bcom", "alias": "Octohuman \ud83d\udc19", "phone": "9250680347"}, {"name": "Tvesa Verma", "code": "53416AA3", "course": "bcom nep", "alias": "Ravi kishan", "phone": "8081868948"}, {"name": "Sanskar Yadav", "code": "830C3E95", "course": "B.com (Hons)", "alias": "", "phone": "7275721063"}, {"name": "Anuj Singh Chauhan", "code": "A5DB6FB9", "course": "B. Com", "alias": "Hanuman ji", "phone": "8546072929"}, {"name": "Vishujeet Singh", "code": "748AC2D4", "course": "Bcom Hons", "alias": "", "phone": "9569628306"}, {"name": "Tanishq Seth", "code": "99899FBC", "course": "Bcom hon SF in faculty of commerce", "alias": "\ud83d\udc26\u200d\ud83d\udd25 Phoenix", "phone": "6388894148"}, {"name": "Pappu yadav", "code": "59087585", "course": "B.Fuck,Tall Branch", "alias": "Chaddha man", "phone": "9371289371"}, {"name": "Monika Singh", "code": "18224CCA", "course": "B.com(hons)", "alias": "", "phone": "8318994471"}, {"name": "Vivek singh", "code": "4454950E", "course": "BCA (AI & ML)", "alias": "", "phone": "7607454985"}, {"name": "Amrat Singh", "code": "96282EF2", "course": "Bcom hons", "alias": "Spiderman", "phone": "9335738191"}, {"name": "Sarvesh Singh", "code": "BD077FF3", "course": "Bcom h", "alias": "Babu rai", "phone": "9287460591"}, {"name": "Himanshu Gupta", "code": "15560268", "course": "B.com hons", "alias": "", "phone": "7905218848"}, {"name": "Mitesh Chand", "code": "56F5D92D", "course": "B.COM (HONS)", "alias": "", "phone": "9415534625"}, {"name": "ABHISHEK", "code": "EA26FD1B", "course": "Bcom hon", "alias": "", "phone": "+916307249207"}, {"name": "Harsh Singh", "code": "7E2A7248", "course": "Bcom Nep self finance", "alias": "Spiderman", "phone": "+917007837471"}, {"name": "SHIVAM YADAV", "code": "773180D4", "course": "B.com Old campus", "alias": "", "phone": "8957687348"}, {"name": "PRAKHAR YADAV", "code": "BF623014", "course": "B.com", "alias": "", "phone": "9140160765"}, {"name": "Aryan raj", "code": "E519E5A3", "course": "B.com(NEP)", "alias": "", "phone": "9555037774"}, {"name": "Antra Patel", "code": "19169377", "course": "Bcom", "alias": "", "phone": "+919065261172"}, {"name": "Harshita", "code": "17D70DB7", "course": "Bcom", "alias": "01", "phone": "6388036654"}, {"name": "Sanskar gupta", "code": "07D9E6F7", "course": "B.com nep", "alias": "", "phone": "8189033476"}, {"name": "Slok Gupta", "code": "3415AA86", "course": "B.com NEP self finance", "alias": "", "phone": "8090892677"}, {"name": "Shreya Singh", "code": "FB4FEA31", "course": "B.com(hons.)", "alias": "Venom", "phone": "9891855082"}, {"name": "Anshul Verma", "code": "BB7E2C17", "course": "B. Com", "alias": "", "phone": "8840578095"}, {"name": "Vyom Saral", "code": "868ED7AB", "course": "B.Com (hons)", "alias": "Miles", "phone": "9170724581"}, {"name": "Vishu Jaiswal", "code": "B6CE5964", "course": "B.con NEP", "alias": "Jadeja \u2764\ufe0f", "phone": "6386642861"}, {"name": "Anchal Verma", "code": "2B25250E", "course": "B.com", "alias": "", "phone": "9473546053"}, {"name": "Garvita Vaish", "code": "41E267AD", "course": "B.com (nep)", "alias": "", "phone": "9335901066"}, {"name": "VASU KUMAR", "code": "C81D52B9", "course": "B.com(NEP)", "alias": "Captain America", "phone": "7905201688"}, {"name": "Nishant kumar", "code": "B8EBBD51", "course": "B.com(NEP)", "alias": "", "phone": "8090380585"}, {"name": "Satya", "code": "6CB5CF84", "course": "B. Com", "alias": "Ironman", "phone": "63876363338"}, {"name": "Rishabh", "code": "09FC8AF1", "course": "Bsc", "alias": "", "phone": "9335934697"}, {"name": "Rytham Pandey", "code": "2DEF8895", "course": "Bcom hons", "alias": "Ap jante hai ! \ud83e\udd21", "phone": "+919415559154"}, {"name": "Rohit singh", "code": "6FF00E60", "course": "B.com nep", "alias": "", "phone": "8303454098"}, {"name": "Mayank", "code": "42FE6E95", "course": "B.com(hons)", "alias": "", "phone": "8922972514"}, {"name": "saniya sabbag", "code": "9C18C9B1", "course": "BCOM Hons", "alias": "", "phone": "7860959070"}, {"name": "Aditya", "code": "2FAD46BF", "course": "B.com self finance", "alias": "\ud83d\ude0e", "phone": "9451278895"}, {"name": "Anshuman Gupta", "code": "619FEAB9", "course": "B.com", "alias": "", "phone": "9936105044"}, {"name": "Krish Srivastava", "code": "BB7B808E", "course": "B.com", "alias": "", "phone": "+916394141030"}, {"name": "SHASWATO BISWAS", "code": "0BD094FB", "course": "B.Com", "alias": "Shersha", "phone": "7478120595"}, {"name": "Varun Dev Dikhit", "code": "574944F9", "course": "B.com NEP", "alias": "Michael Corleone form Godfather and Choti Master Thor", "phone": "9569-272751"}, {"name": "Ashu", "code": "D226BDCE", "course": "B.com (Retail Management)", "alias": "The Hustler\ud83d\udd25", "phone": "9897619990"}, {"name": "Ovitosh Paul", "code": "5A65D0F1", "course": "Bcom NEP", "alias": "Thor", "phone": "9519036883"}, {"name": "Nihal Jaiswal", "code": "5B63B7F8", "course": "Bcom Hons", "alias": "", "phone": "+917518436177"}, {"name": "Divyansh Vaish", "code": "154903FA", "course": "B. Com", "alias": "", "phone": "9278228929"}, {"name": "Aditi Verma", "code": "6B0D2669", "course": "B.com", "alias": "", "phone": "6307422450"}, {"name": "Ishita Sharma", "code": "A2F9FD1F", "course": "Bcom (nep)", "alias": "Idk", "phone": "7311135977"}, {"name": "Mahima yadav", "code": "B7594EA4", "course": "BCom", "alias": "", "phone": "7905994118"}, {"name": "Tanishka Gupta", "code": "049CCD80", "course": "Bcom nep S. F", "alias": "", "phone": "8468050193"}, {"name": "Devansh Yadav", "code": "597A56AA", "course": "Bcom", "alias": "", "phone": "+916388672975"}];
+let ALL_PARTICIPANTS = BASE_PARTICIPANTS.slice();
 
 const byCode = {};
-PARTICIPANTS.forEach(p => { byCode[p.code.toUpperCase()] = p; });
-
-const TOTAL = PARTICIPANTS.length;
-document.getElementById('countNum').textContent = `0/${TOTAL}`;
+function rebuildIndex(){
+  for(const k of Object.keys(byCode)) delete byCode[k];
+  ALL_PARTICIPANTS.forEach(p => { byCode[p.code.toUpperCase()] = p; });
+}
+rebuildIndex();
 
 let checkins = {}; // code -> {name, course, alias, time}
 let flags = [];    // {code, reason, time}
 
 const STORE_PREFIX = 'checkin:';
+const GUEST_PREFIX = 'guest:';
 const FLAG_KEY = 'flags-log';
+
+async function loadGuests(){
+  try{
+    const res = await window.storage.list(GUEST_PREFIX, true);
+    if(res && res.keys && res.keys.length){
+      for(const k of res.keys){
+        try{
+          const item = await window.storage.get(k, true);
+          if(item && item.value){
+            const g = JSON.parse(item.value);
+            if(!byCode[g.code.toUpperCase()]){
+              ALL_PARTICIPANTS.push(g);
+            }
+          }
+        }catch(e){}
+      }
+      rebuildIndex();
+    }
+  }catch(e){}
+}
 
 async function loadState(){
   try{
@@ -403,9 +444,10 @@ function fmtTime(ts){
 }
 
 function renderAll(){
+  const total = ALL_PARTICIPANTS.length;
   const count = Object.keys(checkins).length;
-  document.getElementById('countNum').textContent = `${count}/${TOTAL}`;
-  document.getElementById('progressFill').style.width = `${(count/TOTAL*100).toFixed(1)}%`;
+  document.getElementById('countNum').textContent = `${count}/${total}`;
+  document.getElementById('progressFill').style.width = `${(count/total*100).toFixed(1)}%`;
 
   // Checked-in log, most recent first
   const logList = document.getElementById('logList');
@@ -446,7 +488,7 @@ function renderAll(){
 function renderPending(filter){
   const pendingList = document.getElementById('pendingList');
   const q = (filter || '').trim().toLowerCase();
-  const remaining = PARTICIPANTS.filter(p => !checkins[p.code.toUpperCase()])
+  const remaining = ALL_PARTICIPANTS.filter(p => !checkins[p.code.toUpperCase()])
     .filter(p => !q || p.name.toLowerCase().includes(q) || (p.alias||'').toLowerCase().includes(q));
   if(remaining.length === 0){
     pendingList.innerHTML = `<div class="empty-state">${q ? 'No matches' : 'Everyone has checked in 🎉'}</div>`;
@@ -566,6 +608,76 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
   renderAll();
 });
 
+// Add guest
+function genCode(){
+  const chars = '0123456789ABCDEF';
+  let code;
+  do{
+    code = Array.from({length:8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  } while(byCode[code]);
+  return code;
+}
+
+let lastQrCanvas = null;
+
+document.getElementById('addGuestBtn').addEventListener('click', async () => {
+  const name = document.getElementById('newName').value.trim();
+  const course = document.getElementById('newCourse').value.trim();
+  const alias = document.getElementById('newAlias').value.trim();
+  const manualCode = document.getElementById('newCode').value.trim().toUpperCase();
+  if(!name){ alert('Name is required.'); return; }
+
+  let code;
+  if(manualCode){
+    if(byCode[manualCode]){
+      alert(`Code ${manualCode} is already assigned to ${byCode[manualCode].name}. Use a different code, or leave the field blank to auto-generate one.`);
+      return;
+    }
+    code = manualCode;
+  } else {
+    code = genCode();
+  }
+
+  const guest = { name, course, alias, code };
+
+  try{
+    await window.storage.set(GUEST_PREFIX + code, JSON.stringify(guest), true);
+  }catch(e){
+    alert('Could not save guest — please try again.');
+    return;
+  }
+
+  ALL_PARTICIPANTS.push(guest);
+  rebuildIndex();
+  renderAll();
+
+  document.getElementById('newName').value = '';
+  document.getElementById('newCourse').value = '';
+  document.getElementById('newAlias').value = '';
+  document.getElementById('newCode').value = '';
+
+  document.getElementById('newGuestResult').style.display = 'block';
+  document.getElementById('newGuestName').textContent = name;
+  document.getElementById('newGuestCode').textContent = code;
+
+  const holder = document.getElementById('qrCanvasHolder');
+  holder.innerHTML = '';
+  new QRCode(holder, { text: code, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+  setTimeout(() => { lastQrCanvas = holder.querySelector('canvas'); }, 50);
+});
+
+document.getElementById('downloadQrBtn').addEventListener('click', () => {
+  const canvas = document.getElementById('qrCanvasHolder').querySelector('canvas');
+  if(!canvas) return;
+  const name = document.getElementById('newGuestName').textContent.replace(/[^a-z0-9]/gi,'_');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `qr-${name}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
 // Camera scanner
 let scannerRunning = false;
 function startScanner(){
@@ -593,8 +705,11 @@ function startScanner(){
   });
 }
 
-loadState();
-startScanner();
+(async () => {
+  await loadGuests();
+  await loadState();
+  startScanner();
+})();
 </script>
 </body>
 </html>
