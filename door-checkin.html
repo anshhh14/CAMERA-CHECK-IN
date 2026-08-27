@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Door Check-In</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0B10;
+    --surface:#15151F;
+    --surface-raised:#1D1D2A;
+    --border:#2A2A38;
+    --text:#F2F1F5;
+    --muted:#8C8C9C;
+    --violet:#7C5CFC;
+    --violet-dim:#4B3A9E;
+    --green:#33D17A;
+    --green-dim:#123322;
+    --red:#FF4D63;
+    --red-dim:#3A1420;
+    --amber:#FFB648;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(circle at 50% -10%, #1A1626 0%, #0B0B10 55%);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap{
+    max-width:520px;
+    margin:0 auto;
+    padding:20px 16px 48px;
+  }
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .brand{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .brand .eyebrow{
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--violet);
+    font-weight:700;
+  }
+  .brand h1{
+    font-size:20px;
+    margin:0;
+    font-weight:800;
+    letter-spacing:-0.01em;
+  }
+  .count-pill{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    line-height:1.1;
+  }
+  .count-pill .num{
+    font-family:var(--mono);
+    font-size:22px;
+    font-weight:700;
+  }
+  .count-pill .label{
+    font-size:10px;
+    color:var(--muted);
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .progress-track{
+    height:5px;
+    border-radius:3px;
+    background:var(--surface-raised);
+    overflow:hidden;
+    margin-bottom:18px;
+  }
+  .progress-fill{
+    height:100%;
+    background:linear-gradient(90deg, var(--violet), #B084FF);
+    width:0%;
+    transition:width 0.4s ease;
+  }
+  .scan-frame{
+    position:relative;
+    border-radius:20px;
+    overflow:hidden;
+    background:var(--surface);
+    border:1px solid var(--border);
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  #reader{
+    width:100% !important;
+    height:100% !important;
+  }
+  #reader video{
+    object-fit:cover;
+    width:100% !important;
+    height:100% !important;
+  }
+  #reader img{ display:none !important; }
+  .scan-corner-hint{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    border-radius:20px;
+    box-shadow: inset 0 0 0 2px rgba(124,92,252,0.35);
+  }
+  .cam-off{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    color:var(--muted);
+    padding:20px;
+    text-align:center;
+  }
+  .cam-off button, .primary-btn{
+    background:var(--violet);
+    color:white;
+    border:none;
+    padding:12px 20px;
+    border-radius:12px;
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .cam-off button:active, .primary-btn:active{ transform:scale(0.98); }
+
+  .result-banner{
+    margin-top:16px;
+    border-radius:16px;
+    padding:16px 18px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    min-height:76px;
+    border:1px solid var(--border);
+    background:var(--surface);
+    transition:background 0.2s ease, border-color 0.2s ease;
+  }
+  .result-banner.idle .r-title{ color:var(--muted); font-weight:600; }
+  .result-banner.ok{ background:var(--green-dim); border-color:rgba(51,209,122,0.4); }
+  .result-banner.fail{ background:var(--red-dim); border-color:rgba(255,77,99,0.4); }
+  .result-icon{
+    width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;
+    flex-shrink:0;
+    background:var(--surface-raised);
+  }
+  .result-banner.ok .result-icon{ background:var(--green); color:#08210F; }
+  .result-banner.fail .result-icon{ background:var(--red); color:#2A0810; }
+  .r-body{ flex:1; min-width:0; }
+  .r-title{ font-weight:800; font-size:16px; margin-bottom:2px; }
+  .r-sub{ font-size:12.5px; color:var(--muted); }
+  .result-banner.ok .r-sub{ color:#9AE8BE; }
+  .result-banner.fail .r-sub{ color:#FFB3BE; }
+
+  .manual-toggle{
+    margin-top:14px;
+    display:flex;
+    gap:8px;
+  }
+  .manual-toggle input{
+    flex:1;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:12px 14px;
+    border-radius:12px;
+    font-family:var(--mono);
+    font-size:14px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+  }
+  .manual-toggle input:focus{ outline:2px solid var(--violet); }
+  .manual-toggle button{
+    background:var(--surface-raised);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:0 18px;
+    border-radius:12px;
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin-top:26px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
+  .tab{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-weight:700;
+    font-size:13px;
+    padding:8px 4px 10px;
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    margin-right:14px;
+  }
+  .tab.active{ color:var(--text); border-color:var(--violet); }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .log-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:11px 4px;
+    border-bottom:1px solid var(--border);
+  }
+  .log-item:last-child{ border-bottom:none; }
+  .log-name{ font-weight:700; font-size:14px; }
+  .log-meta{ font-size:11.5px; color:var(--muted); margin-top:1px; }
+  .log-time{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--violet);
+    white-space:nowrap;
+  }
+  .empty-state{
+    text-align:center;
+    color:var(--muted);
+    padding:36px 12px;
+    font-size:13.5px;
+  }
+
+  .flag-item .log-name{ color:var(--red); }
+  .flag-item .log-time{ color:var(--red); }
+
+  .search-box{
+    width:100%;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 14px;
+    border-radius:12px;
+    font-size:13.5px;
+    margin-bottom:10px;
+  }
+  .search-box:focus{ outline:2px solid var(--violet); }
+
+  .export-row{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+  }
+  .export-row button{
+    flex:1;
+    padding:12px;
+    border-radius:12px;
+    font-weight:700;
+    font-size:13px;
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--surface-raised);
+    color:var(--text);
+  }
+  .export-row button.primary{
+    background:var(--violet);
+    border:none;
+  }
+  .footnote{
+    text-align:center;
+    color:var(--muted);
+    font-size:11px;
+    margin-top:22px;
+    letter-spacing:0.02em;
+  }
+  ::-webkit-scrollbar{ width:0; height:0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="eyebrow">Door Check-In</span>
+      <h1>Event Entry Scanner</h1>
+    </div>
+    <div class="count-pill">
+      <span class="num" id="countNum">0/63</span>
+      <span class="label">checked in</span>
+    </div>
+  </header>
+
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="scan-frame">
+    <div id="reader"></div>
+    <div class="scan-corner-hint"></div>
+  </div>
+
+  <div class="result-banner idle" id="resultBanner">
+    <div class="result-icon" id="resultIcon">◎</div>
+    <div class="r-body">
+      <div class="r-title" id="resultTitle">Point the camera at a QR code</div>
+      <div class="r-sub" id="resultSub">Entries are checked against the guest list automatically</div>
+    </div>
+  </div>
+
+  <div class="manual-toggle">
+    <input type="text" id="manualInput" placeholder="Or type code manually (e.g. A2875B6A)" maxlength="12" />
+    <button id="manualBtn">Check</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="log">Checked in</button>
+    <button class="tab" data-tab="flags">Flags</button>
+    <button class="tab" data-tab="pending">Not arrived</button>
+  </div>
+
+  <div class="panel active" id="panel-log">
+    <div id="logList"></div>
+  </div>
+
+  <div class="panel" id="panel-flags">
+    <div id="flagList"></div>
+  </div>
+
+  <div class="panel" id="panel-pending">
+    <input class="search-box" id="pendingSearch" placeholder="Search remaining guests..." />
+    <div id="pendingList"></div>
+  </div>
+
+  <div class="export-row">
+    <button class="primary" id="exportBtn">Export check-ins (CSV)</button>
+    <button id="resetBtn">Reset event</button>
+  </div>
+
+  <div class="footnote">Data syncs live across every device running this scanner for this event.</div>
+</div>
+
+<script>
+const PARTICIPANTS = [{"name": "Prakhar Sharan", "code": "A2875B6A", "course": "B.COM(HONS)", "alias": "", "phone": "9140343403"}, {"name": "Arush Pal", "code": "01721666", "course": "B.com", "alias": "", "phone": "8423619921"}, {"name": "Ridhima Kashyap", "code": "A2810000", "course": "Bcom nep regular", "alias": "Hello", "phone": "8317085593"}, {"name": "Shreya Dubey", "code": "E8977D98", "course": "B.com e-commerce Lucknow University", "alias": "", "phone": "9936698715"}, {"name": "Kaji md sadik", "code": "DAD3FD98", "course": "B.com Nep SF", "alias": "", "phone": "7266844108"}, {"name": "PRAKHAR YADAV", "code": "E60FDA0F", "course": "B.com old campus", "alias": "", "phone": "9140160765"}, {"name": "Mohit singh sisaudiya", "code": "A7D7051B", "course": "B.com nep", "alias": "", "phone": "+919305473465"}, {"name": "Vaibhav Kumar", "code": "6CA57A9E", "course": "Bcom hons", "alias": "", "phone": "9198574636"}, {"name": "Shreya Rao", "code": "AEAB437E", "course": "BCom hons", "alias": "Dr. Strange", "phone": "9695550425"}, {"name": "Daksh Prasad", "code": "F4687186", "course": "B.com(Hons)", "alias": "", "phone": "8545877262"}, {"name": "Janvi Yadav", "code": "2E7F8C8B", "course": "BCOM(NEP)", "alias": "", "phone": "7007761700"}, {"name": "ADARSH VERMA", "code": "ACA3F02E", "course": "Bcom", "alias": "", "phone": "+917755866540"}, {"name": "Aditya raj singh", "code": "496E9A7E", "course": "Bcom(nep)", "alias": "", "phone": "+917007708233"}, {"name": "Supriya milan", "code": "7D206DCD", "course": "Bcom", "alias": "Octohuman \ud83d\udc19", "phone": "9250680347"}, {"name": "Tvesa Verma", "code": "53416AA3", "course": "bcom nep", "alias": "Ravi kishan", "phone": "8081868948"}, {"name": "Sanskar Yadav", "code": "830C3E95", "course": "B.com (Hons)", "alias": "", "phone": "7275721063"}, {"name": "Anuj Singh Chauhan", "code": "A5DB6FB9", "course": "B. Com", "alias": "Hanuman ji", "phone": "8546072929"}, {"name": "Vishujeet Singh", "code": "748AC2D4", "course": "Bcom Hons", "alias": "", "phone": "9569628306"}, {"name": "Tanishq Seth", "code": "99899FBC", "course": "Bcom hon SF in faculty of commerce", "alias": "\ud83d\udc26\u200d\ud83d\udd25 Phoenix", "phone": "6388894148"}, {"name": "Pappu yadav", "code": "59087585", "course": "B.Fuck,Tall Branch", "alias": "Chaddha man", "phone": "9371289371"}, {"name": "Monika Singh", "code": "18224CCA", "course": "B.com(hons)", "alias": "", "phone": "8318994471"}, {"name": "Vivek singh", "code": "4454950E", "course": "BCA (AI & ML)", "alias": "", "phone": "7607454985"}, {"name": "Amrat Singh", "code": "96282EF2", "course": "Bcom hons", "alias": "Spiderman", "phone": "9335738191"}, {"name": "Sarvesh Singh", "code": "BD077FF3", "course": "Bcom h", "alias": "Babu rai", "phone": "9287460591"}, {"name": "Himanshu Gupta", "code": "15560268", "course": "B.com hons", "alias": "", "phone": "7905218848"}, {"name": "Mitesh Chand", "code": "56F5D92D", "course": "B.COM (HONS)", "alias": "", "phone": "9415534625"}, {"name": "ABHISHEK", "code": "EA26FD1B", "course": "Bcom hon", "alias": "", "phone": "+916307249207"}, {"name": "Harsh Singh", "code": "7E2A7248", "course": "Bcom Nep self finance", "alias": "Spiderman", "phone": "+917007837471"}, {"name": "SHIVAM YADAV", "code": "773180D4", "course": "B.com Old campus", "alias": "", "phone": "8957687348"}, {"name": "PRAKHAR YADAV", "code": "BF623014", "course": "B.com", "alias": "", "phone": "9140160765"}, {"name": "Aryan raj", "code": "E519E5A3", "course": "B.com(NEP)", "alias": "", "phone": "9555037774"}, {"name": "Antra Patel", "code": "19169377", "course": "Bcom", "alias": "", "phone": "+919065261172"}, {"name": "Harshita", "code": "17D70DB7", "course": "Bcom", "alias": "01", "phone": "6388036654"}, {"name": "Sanskar gupta", "code": "07D9E6F7", "course": "B.com nep", "alias": "", "phone": "8189033476"}, {"name": "Slok Gupta", "code": "3415AA86", "course": "B.com NEP self finance", "alias": "", "phone": "8090892677"}, {"name": "Shreya Singh", "code": "FB4FEA31", "course": "B.com(hons.)", "alias": "Venom", "phone": "9891855082"}, {"name": "Anshul Verma", "code": "BB7E2C17", "course": "B. Com", "alias": "", "phone": "8840578095"}, {"name": "Vyom Saral", "code": "868ED7AB", "course": "B.Com (hons)", "alias": "Miles", "phone": "9170724581"}, {"name": "Vishu Jaiswal", "code": "B6CE5964", "course": "B.con NEP", "alias": "Jadeja \u2764\ufe0f", "phone": "6386642861"}, {"name": "Anchal Verma", "code": "2B25250E", "course": "B.com", "alias": "", "phone": "9473546053"}, {"name": "Garvita Vaish", "code": "41E267AD", "course": "B.com (nep)", "alias": "", "phone": "9335901066"}, {"name": "VASU KUMAR", "code": "C81D52B9", "course": "B.com(NEP)", "alias": "Captain America", "phone": "7905201688"}, {"name": "Nishant kumar", "code": "B8EBBD51", "course": "B.com(NEP)", "alias": "", "phone": "8090380585"}, {"name": "Satya", "code": "6CB5CF84", "course": "B. Com", "alias": "Ironman", "phone": "63876363338"}, {"name": "Rishabh", "code": "09FC8AF1", "course": "Bsc", "alias": "", "phone": "9335934697"}, {"name": "Rytham Pandey", "code": "2DEF8895", "course": "Bcom hons", "alias": "Ap jante hai ! \ud83e\udd21", "phone": "+919415559154"}, {"name": "Rohit singh", "code": "6FF00E60", "course": "B.com nep", "alias": "", "phone": "8303454098"}, {"name": "Mayank", "code": "42FE6E95", "course": "B.com(hons)", "alias": "", "phone": "8922972514"}, {"name": "saniya sabbag", "code": "9C18C9B1", "course": "BCOM Hons", "alias": "", "phone": "7860959070"}, {"name": "Aditya", "code": "2FAD46BF", "course": "B.com self finance", "alias": "\ud83d\ude0e", "phone": "9451278895"}, {"name": "Anshuman Gupta", "code": "619FEAB9", "course": "B.com", "alias": "", "phone": "9936105044"}, {"name": "Krish Srivastava", "code": "BB7B808E", "course": "B.com", "alias": "", "phone": "+916394141030"}, {"name": "SHASWATO BISWAS", "code": "0BD094FB", "course": "B.Com", "alias": "Shersha", "phone": "7478120595"}, {"name": "Varun Dev Dikhit", "code": "574944F9", "course": "B.com NEP", "alias": "Michael Corleone form Godfather and Choti Master Thor", "phone": "9569-272751"}, {"name": "Ashu", "code": "D226BDCE", "course": "B.com (Retail Management)", "alias": "The Hustler\ud83d\udd25", "phone": "9897619990"}, {"name": "Ovitosh Paul", "code": "5A65D0F1", "course": "Bcom NEP", "alias": "Thor", "phone": "9519036883"}, {"name": "Nihal Jaiswal", "code": "5B63B7F8", "course": "Bcom Hons", "alias": "", "phone": "+917518436177"}, {"name": "Divyansh Vaish", "code": "154903FA", "course": "B. Com", "alias": "", "phone": "9278228929"}, {"name": "Aditi Verma", "code": "6B0D2669", "course": "B.com", "alias": "", "phone": "6307422450"}, {"name": "Ishita Sharma", "code": "A2F9FD1F", "course": "Bcom (nep)", "alias": "Idk", "phone": "7311135977"}, {"name": "Mahima yadav", "code": "B7594EA4", "course": "BCom", "alias": "", "phone": "7905994118"}, {"name": "Tanishka Gupta", "code": "049CCD80", "course": "Bcom nep S. F", "alias": "", "phone": "8468050193"}, {"name": "Devansh Yadav", "code": "597A56AA", "course": "Bcom", "alias": "", "phone": "+916388672975"}];
+
+const byCode = {};
+PARTICIPANTS.forEach(p => { byCode[p.code.toUpperCase()] = p; });
+
+const TOTAL = PARTICIPANTS.length;
+document.getElementById('countNum').textContent = `0/${TOTAL}`;
+
+let checkins = {}; // code -> {name, course, alias, time}
+let flags = [];    // {code, reason, time}
+
+const STORE_PREFIX = 'checkin:';
+const FLAG_KEY = 'flags-log';
+
+async function loadState(){
+  try{
+    const res = await window.storage.list(STORE_PREFIX, true);
+    if(res && res.keys && res.keys.length){
+      for(const k of res.keys){
+        try{
+          const item = await window.storage.get(k, true);
+          if(item && item.value){
+            const code = k.slice(STORE_PREFIX.length);
+            checkins[code] = JSON.parse(item.value);
+          }
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  try{
+    const f = await window.storage.get(FLAG_KEY, true);
+    if(f && f.value){ flags = JSON.parse(f.value); }
+  }catch(e){}
+  renderAll();
+}
+
+async function saveCheckin(code, record){
+  checkins[code] = record;
+  try{ await window.storage.set(STORE_PREFIX + code, JSON.stringify(record), true); }catch(e){}
+}
+
+async function saveFlags(){
+  try{ await window.storage.set(FLAG_KEY, JSON.stringify(flags), true); }catch(e){}
+}
+
+function fmtTime(ts){
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+function renderAll(){
+  const count = Object.keys(checkins).length;
+  document.getElementById('countNum').textContent = `${count}/${TOTAL}`;
+  document.getElementById('progressFill').style.width = `${(count/TOTAL*100).toFixed(1)}%`;
+
+  // Checked-in log, most recent first
+  const logList = document.getElementById('logList');
+  const entries = Object.entries(checkins).sort((a,b)=> b[1].time - a[1].time);
+  if(entries.length === 0){
+    logList.innerHTML = `<div class="empty-state">No entries yet — start scanning</div>`;
+  } else {
+    logList.innerHTML = entries.map(([code, r]) => `
+      <div class="log-item">
+        <div>
+          <div class="log-name">${escapeHtml(r.name)}</div>
+          <div class="log-meta">${escapeHtml(r.course || '')}${r.alias ? ' · "'+escapeHtml(r.alias)+'"' : ''} · ${code}</div>
+        </div>
+        <div class="log-time">${fmtTime(r.time)}</div>
+      </div>
+    `).join('');
+  }
+
+  // Flags
+  const flagList = document.getElementById('flagList');
+  if(flags.length === 0){
+    flagList.innerHTML = `<div class="empty-state">No suspicious scans yet</div>`;
+  } else {
+    flagList.innerHTML = flags.slice().reverse().map(f => `
+      <div class="log-item flag-item">
+        <div>
+          <div class="log-name">${escapeHtml(f.reason)}</div>
+          <div class="log-meta">Code scanned: ${escapeHtml(f.code)}</div>
+        </div>
+        <div class="log-time">${fmtTime(f.time)}</div>
+      </div>
+    `).join('');
+  }
+
+  renderPending();
+}
+
+function renderPending(filter){
+  const pendingList = document.getElementById('pendingList');
+  const q = (filter || '').trim().toLowerCase();
+  const remaining = PARTICIPANTS.filter(p => !checkins[p.code.toUpperCase()])
+    .filter(p => !q || p.name.toLowerCase().includes(q) || (p.alias||'').toLowerCase().includes(q));
+  if(remaining.length === 0){
+    pendingList.innerHTML = `<div class="empty-state">${q ? 'No matches' : 'Everyone has checked in 🎉'}</div>`;
+  } else {
+    pendingList.innerHTML = remaining.map(p => `
+      <div class="log-item">
+        <div>
+          <div class="log-name">${escapeHtml(p.name)}</div>
+          <div class="log-meta">${escapeHtml(p.course || '')}${p.alias ? ' · "'+escapeHtml(p.alias)+'"' : ''}</div>
+        </div>
+        <div class="log-time">${p.code}</div>
+      </div>
+    `).join('');
+  }
+}
+
+function escapeHtml(s){
+  return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+async function handleCode(raw){
+  const code = String(raw || '').trim().toUpperCase();
+  if(!code) return;
+  const banner = document.getElementById('resultBanner');
+  const icon = document.getElementById('resultIcon');
+  const title = document.getElementById('resultTitle');
+  const sub = document.getElementById('resultSub');
+
+  const person = byCode[code];
+
+  if(!person){
+    banner.className = 'result-banner fail';
+    icon.textContent = '✕';
+    title.textContent = 'Invalid code — not on the list';
+    sub.textContent = `Scanned: ${code}`;
+    flags.push({code, reason:'Unregistered / invalid code scanned', time: Date.now()});
+    await saveFlags();
+    renderAll();
+    return;
+  }
+
+  if(checkins[code]){
+    banner.className = 'result-banner fail';
+    icon.textContent = '⚠';
+    title.textContent = `${person.name} — already checked in`;
+    sub.textContent = `First entry at ${fmtTime(checkins[code].time)}. Possible duplicate/scam scan.`;
+    flags.push({code, reason:`Duplicate scan attempt: ${person.name}`, time: Date.now()});
+    await saveFlags();
+    renderAll();
+    return;
+  }
+
+  banner.className = 'result-banner ok';
+  icon.textContent = '✓';
+  title.textContent = `Welcome, ${person.name}`;
+  sub.textContent = `${person.course || ''}${person.alias ? ' · "'+person.alias+'"' : ''} — entry granted`;
+
+  await saveCheckin(code, {
+    name: person.name,
+    course: person.course,
+    alias: person.alias,
+    time: Date.now()
+  });
+  renderAll();
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.getElementById('pendingSearch').addEventListener('input', (e) => renderPending(e.target.value));
+
+// Manual entry
+document.getElementById('manualBtn').addEventListener('click', () => {
+  const input = document.getElementById('manualInput');
+  handleCode(input.value);
+  input.value = '';
+});
+document.getElementById('manualInput').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ document.getElementById('manualBtn').click(); }
+});
+
+// Export CSV
+document.getElementById('exportBtn').addEventListener('click', () => {
+  let csv = 'name,course,alias,code,time\n';
+  Object.entries(checkins).sort((a,b)=>a[1].time-b[1].time).forEach(([code, r]) => {
+    const row = [r.name, r.course||'', r.alias||'', code, new Date(r.time).toISOString()]
+      .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+    csv += row + '\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'checkin-log.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// Reset
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  if(!confirm('Clear ALL check-in data for everyone? This cannot be undone.')) return;
+  for(const code of Object.keys(checkins)){
+    try{ await window.storage.delete(STORE_PREFIX + code, true); }catch(e){}
+  }
+  checkins = {};
+  flags = [];
+  await saveFlags();
+  renderAll();
+});
+
+// Camera scanner
+let scannerRunning = false;
+function startScanner(){
+  const readerEl = document.getElementById('reader');
+  const html5QrCode = new Html5Qrcode('reader');
+  let lastScan = 0;
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    (decodedText) => {
+      const now = Date.now();
+      if(now - lastScan < 1500) return; // debounce rapid repeat frames
+      lastScan = now;
+      handleCode(decodedText);
+    },
+    (errorMessage) => { /* ignore per-frame scan misses */ }
+  ).then(() => { scannerRunning = true; })
+  .catch((err) => {
+    readerEl.innerHTML = `
+      <div class="cam-off">
+        <div>Couldn't access the camera.<br/>Check permissions, or use manual entry below.</div>
+        <button id="retryCam">Try again</button>
+      </div>`;
+    document.getElementById('retryCam').addEventListener('click', startScanner);
+  });
+}
+
+loadState();
+startScanner();
+</script>
+</body>
+</html>
