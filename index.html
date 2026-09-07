@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>Door Check-In</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --bg:#0B0B10;
@@ -171,6 +172,43 @@
   .result-banner.ok .r-sub{ color:#9AE8BE; }
   .result-banner.fail .r-sub{ color:#FFB3BE; }
 
+  .warn-banner{
+    margin-bottom:14px;
+    border-radius:14px;
+    padding:14px 16px;
+    background:var(--red-dim);
+    border:1px solid rgba(255,77,99,0.4);
+    font-size:13px;
+    line-height:1.5;
+  }
+  .warn-banner strong{ color:#FFB3BE; display:block; margin-bottom:4px; font-size:13.5px; }
+  .warn-banner a{ color:var(--amber); font-weight:700; text-decoration:underline; }
+  .warn-banner .copy-link-row{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .warn-banner .copy-link-row input{
+    flex:1;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:10px;
+    font-size:11.5px;
+    font-family:var(--mono);
+  }
+  .warn-banner .copy-link-row button{
+    background:var(--surface-raised);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:0 14px;
+    border-radius:10px;
+    font-weight:700;
+    font-size:12px;
+    cursor:pointer;
+  }
+
   .manual-toggle{
     margin-top:14px;
     display:flex;
@@ -299,12 +337,14 @@
       <h1>Event Entry Scanner</h1>
     </div>
     <div class="count-pill">
-      <span class="num" id="countNum">0/63</span>
+      <span class="num" id="countNum">0/1</span>
       <span class="label">checked in</span>
     </div>
   </header>
 
   <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div id="browserWarning" style="display:none;"></div>
 
   <div class="scan-frame">
     <div id="reader"></div>
@@ -320,7 +360,7 @@
   </div>
 
   <div class="manual-toggle">
-    <input type="text" id="manualInput" placeholder="Or type code manually (e.g. A2875B6A)" maxlength="12" />
+    <input type="text" id="manualInput" placeholder="Or type pass ID manually (e.g. RMP-4622-FFBE)" maxlength="16" />
     <button id="manualBtn">Check</button>
   </div>
 
@@ -328,6 +368,7 @@
     <button class="tab active" data-tab="log">Checked in</button>
     <button class="tab" data-tab="flags">Flags</button>
     <button class="tab" data-tab="pending">Not arrived</button>
+    <button class="tab" data-tab="add">+ Add guest</button>
   </div>
 
   <div class="panel active" id="panel-log">
@@ -341,6 +382,23 @@
   <div class="panel" id="panel-pending">
     <input class="search-box" id="pendingSearch" placeholder="Search remaining guests..." />
     <div id="pendingList"></div>
+  </div>
+
+  <div class="panel" id="panel-add">
+    <div class="add-form">
+      <input class="search-box" id="newName" placeholder="Full name (required)" />
+      <input class="search-box" id="newPassType" placeholder="Pass type (e.g. FRESHER, VIP)" />
+      <input class="search-box" id="newPhone" placeholder="Phone number" />
+      <input class="search-box" id="newEmail" placeholder="Email" />
+      <input class="search-box" id="newPassId" placeholder="Existing pass ID (optional — leave blank to auto-generate)" style="font-family:var(--mono); text-transform:uppercase;" />
+      <button class="primary-btn" id="addGuestBtn" style="width:100%;margin-top:4px;">Add guest &amp; generate QR</button>
+    </div>
+    <div id="newGuestResult" style="display:none; margin-top:18px; text-align:center;">
+      <div class="r-title" style="margin-bottom:10px;" id="newGuestName"></div>
+      <div id="qrCanvasHolder" style="display:inline-block; background:#fff; padding:14px; border-radius:14px;"></div>
+      <div class="log-meta" style="margin:10px 0;">Code: <span id="newGuestCode" style="font-family:var(--mono); color:var(--text);"></span></div>
+      <button class="primary-btn" id="downloadQrBtn">Download QR</button>
+    </div>
   </div>
 
   <div class="export-row">
@@ -386,16 +444,42 @@ const storage = {
   }
 };
 
-const PARTICIPANTS = [{"name": "Prakhar Sharan", "code": "A2875B6A", "course": "B.COM(HONS)", "alias": "", "phone": "9140343403"}, {"name": "Arush Pal", "code": "01721666", "course": "B.com", "alias": "", "phone": "8423619921"}, {"name": "Ridhima Kashyap", "code": "A2810000", "course": "Bcom nep regular", "alias": "Hello", "phone": "8317085593"}, {"name": "Shreya Dubey", "code": "E8977D98", "course": "B.com e-commerce Lucknow University", "alias": "", "phone": "9936698715"}, {"name": "Kaji md sadik", "code": "DAD3FD98", "course": "B.com Nep SF", "alias": "", "phone": "7266844108"}, {"name": "PRAKHAR YADAV", "code": "E60FDA0F", "course": "B.com old campus", "alias": "", "phone": "9140160765"}, {"name": "Mohit singh sisaudiya", "code": "A7D7051B", "course": "B.com nep", "alias": "", "phone": "+919305473465"}, {"name": "Vaibhav Kumar", "code": "6CA57A9E", "course": "Bcom hons", "alias": "", "phone": "9198574636"}, {"name": "Shreya Rao", "code": "AEAB437E", "course": "BCom hons", "alias": "Dr. Strange", "phone": "9695550425"}, {"name": "Daksh Prasad", "code": "F4687186", "course": "B.com(Hons)", "alias": "", "phone": "8545877262"}, {"name": "Janvi Yadav", "code": "2E7F8C8B", "course": "BCOM(NEP)", "alias": "", "phone": "7007761700"}, {"name": "ADARSH VERMA", "code": "ACA3F02E", "course": "Bcom", "alias": "", "phone": "+917755866540"}, {"name": "Aditya raj singh", "code": "496E9A7E", "course": "Bcom(nep)", "alias": "", "phone": "+917007708233"}, {"name": "Supriya milan", "code": "7D206DCD", "course": "Bcom", "alias": "Octohuman \ud83d\udc19", "phone": "9250680347"}, {"name": "Tvesa Verma", "code": "53416AA3", "course": "bcom nep", "alias": "Ravi kishan", "phone": "8081868948"}, {"name": "Sanskar Yadav", "code": "830C3E95", "course": "B.com (Hons)", "alias": "", "phone": "7275721063"}, {"name": "Anuj Singh Chauhan", "code": "A5DB6FB9", "course": "B. Com", "alias": "Hanuman ji", "phone": "8546072929"}, {"name": "Vishujeet Singh", "code": "748AC2D4", "course": "Bcom Hons", "alias": "", "phone": "9569628306"}, {"name": "Tanishq Seth", "code": "99899FBC", "course": "Bcom hon SF in faculty of commerce", "alias": "\ud83d\udc26\u200d\ud83d\udd25 Phoenix", "phone": "6388894148"}, {"name": "Pappu yadav", "code": "59087585", "course": "B.Fuck,Tall Branch", "alias": "Chaddha man", "phone": "9371289371"}, {"name": "Monika Singh", "code": "18224CCA", "course": "B.com(hons)", "alias": "", "phone": "8318994471"}, {"name": "Vivek singh", "code": "4454950E", "course": "BCA (AI & ML)", "alias": "", "phone": "7607454985"}, {"name": "Amrat Singh", "code": "96282EF2", "course": "Bcom hons", "alias": "Spiderman", "phone": "9335738191"}, {"name": "Sarvesh Singh", "code": "BD077FF3", "course": "Bcom h", "alias": "Babu rai", "phone": "9287460591"}, {"name": "Himanshu Gupta", "code": "15560268", "course": "B.com hons", "alias": "", "phone": "7905218848"}, {"name": "Mitesh Chand", "code": "56F5D92D", "course": "B.COM (HONS)", "alias": "", "phone": "9415534625"}, {"name": "ABHISHEK", "code": "EA26FD1B", "course": "Bcom hon", "alias": "", "phone": "+916307249207"}, {"name": "Harsh Singh", "code": "7E2A7248", "course": "Bcom Nep self finance", "alias": "Spiderman", "phone": "+917007837471"}, {"name": "SHIVAM YADAV", "code": "773180D4", "course": "B.com Old campus", "alias": "", "phone": "8957687348"}, {"name": "PRAKHAR YADAV", "code": "BF623014", "course": "B.com", "alias": "", "phone": "9140160765"}, {"name": "Aryan raj", "code": "E519E5A3", "course": "B.com(NEP)", "alias": "", "phone": "9555037774"}, {"name": "Antra Patel", "code": "19169377", "course": "Bcom", "alias": "", "phone": "+919065261172"}, {"name": "Harshita", "code": "17D70DB7", "course": "Bcom", "alias": "01", "phone": "6388036654"}, {"name": "Sanskar gupta", "code": "07D9E6F7", "course": "B.com nep", "alias": "", "phone": "8189033476"}, {"name": "Slok Gupta", "code": "3415AA86", "course": "B.com NEP self finance", "alias": "", "phone": "8090892677"}, {"name": "Shreya Singh", "code": "FB4FEA31", "course": "B.com(hons.)", "alias": "Venom", "phone": "9891855082"}, {"name": "Anshul Verma", "code": "BB7E2C17", "course": "B. Com", "alias": "", "phone": "8840578095"}, {"name": "Vyom Saral", "code": "868ED7AB", "course": "B.Com (hons)", "alias": "Miles", "phone": "9170724581"}, {"name": "Vishu Jaiswal", "code": "B6CE5964", "course": "B.con NEP", "alias": "Jadeja \u2764\ufe0f", "phone": "6386642861"}, {"name": "Anchal Verma", "code": "2B25250E", "course": "B.com", "alias": "", "phone": "9473546053"}, {"name": "Garvita Vaish", "code": "41E267AD", "course": "B.com (nep)", "alias": "", "phone": "9335901066"}, {"name": "VASU KUMAR", "code": "C81D52B9", "course": "B.com(NEP)", "alias": "Captain America", "phone": "7905201688"}, {"name": "Nishant kumar", "code": "B8EBBD51", "course": "B.com(NEP)", "alias": "", "phone": "8090380585"}, {"name": "Satya", "code": "6CB5CF84", "course": "B. Com", "alias": "Ironman", "phone": "63876363338"}, {"name": "Rishabh", "code": "09FC8AF1", "course": "Bsc", "alias": "", "phone": "9335934697"}, {"name": "Rytham Pandey", "code": "2DEF8895", "course": "Bcom hons", "alias": "Ap jante hai ! \ud83e\udd21", "phone": "+919415559154"}, {"name": "Rohit singh", "code": "6FF00E60", "course": "B.com nep", "alias": "", "phone": "8303454098"}, {"name": "Mayank", "code": "42FE6E95", "course": "B.com(hons)", "alias": "", "phone": "8922972514"}, {"name": "saniya sabbag", "code": "9C18C9B1", "course": "BCOM Hons", "alias": "", "phone": "7860959070"}, {"name": "Aditya", "code": "2FAD46BF", "course": "B.com self finance", "alias": "\ud83d\ude0e", "phone": "9451278895"}, {"name": "Anshuman Gupta", "code": "619FEAB9", "course": "B.com", "alias": "", "phone": "9936105044"}, {"name": "Krish Srivastava", "code": "BB7B808E", "course": "B.com", "alias": "", "phone": "+916394141030"}, {"name": "SHASWATO BISWAS", "code": "0BD094FB", "course": "B.Com", "alias": "Shersha", "phone": "7478120595"}, {"name": "Varun Dev Dikhit", "code": "574944F9", "course": "B.com NEP", "alias": "Michael Corleone form Godfather and Choti Master Thor", "phone": "9569-272751"}, {"name": "Ashu", "code": "D226BDCE", "course": "B.com (Retail Management)", "alias": "The Hustler\ud83d\udd25", "phone": "9897619990"}, {"name": "Ovitosh Paul", "code": "5A65D0F1", "course": "Bcom NEP", "alias": "Thor", "phone": "9519036883"}, {"name": "Nihal Jaiswal", "code": "5B63B7F8", "course": "Bcom Hons", "alias": "", "phone": "+917518436177"}, {"name": "Divyansh Vaish", "code": "154903FA", "course": "B. Com", "alias": "", "phone": "9278228929"}, {"name": "Aditi Verma", "code": "6B0D2669", "course": "B.com", "alias": "", "phone": "6307422450"}, {"name": "Ishita Sharma", "code": "A2F9FD1F", "course": "Bcom (nep)", "alias": "Idk", "phone": "7311135977"}, {"name": "Mahima yadav", "code": "B7594EA4", "course": "BCom", "alias": "", "phone": "7905994118"}, {"name": "Tanishka Gupta", "code": "049CCD80", "course": "Bcom nep S. F", "alias": "", "phone": "8468050193"}, {"name": "Devansh Yadav", "code": "597A56AA", "course": "Bcom", "alias": "", "phone": "+916388672975"}];
+const BASE_PARTICIPANTS = [{"name": "VARUN DEV DIKHIT", "passType": "FRESHER", "phone": "9569272751", "email": "varundevdikhit@gmail.com", "passId": "4622FFBE"}];
+let ALL_PARTICIPANTS = BASE_PARTICIPANTS.slice();
 
 const byCode = {};
-PARTICIPANTS.forEach(p => { byCode[p.code.toUpperCase()] = p; });
+function rebuildIndex(){
+  for(const k of Object.keys(byCode)) delete byCode[k];
+  ALL_PARTICIPANTS.forEach(p => { byCode[normalizeCode(p.passId)] = p; });
+}
+rebuildIndex();
 
-let checkins = {}; // code -> {name, course, alias, time}
+let checkins = {}; // passId -> {name, passType, phone, email, time}
 let flags = [];    // {code, reason, time}
 
 const STORE_PREFIX = 'checkin:';
+const GUEST_PREFIX = 'guest:';
 const FLAG_KEY = 'flags-log';
+
+async function loadGuests(){
+  try{
+    const res = await storage.list(GUEST_PREFIX);
+    if(res && res.keys && res.keys.length){
+      for(const k of res.keys){
+        try{
+          const item = await storage.get(k);
+          if(item && item.value){
+            const g = JSON.parse(item.value);
+            if(!byCode[normalizeCode(g.passId)]){
+              ALL_PARTICIPANTS.push(g);
+            }
+          }
+        }catch(e){}
+      }
+      rebuildIndex();
+    }
+  }catch(e){}
+}
 
 async function loadState(){
   try{
@@ -434,7 +518,7 @@ function fmtTime(ts){
 }
 
 function renderAll(){
-  const total = PARTICIPANTS.length;
+  const total = ALL_PARTICIPANTS.length;
   const count = Object.keys(checkins).length;
   document.getElementById('countNum').textContent = `${count}/${total}`;
   document.getElementById('progressFill').style.width = `${(count/total*100).toFixed(1)}%`;
@@ -449,7 +533,7 @@ function renderAll(){
       <div class="log-item">
         <div>
           <div class="log-name">${escapeHtml(r.name)}</div>
-          <div class="log-meta">${escapeHtml(r.course || '')}${r.alias ? ' · "'+escapeHtml(r.alias)+'"' : ''} · ${code}</div>
+          <div class="log-meta">${escapeHtml(r.passType || '')}${r.email ? ' · '+escapeHtml(r.email) : ''} · ${code}</div>
         </div>
         <div class="log-time">${fmtTime(r.time)}</div>
       </div>
@@ -478,8 +562,8 @@ function renderAll(){
 function renderPending(filter){
   const pendingList = document.getElementById('pendingList');
   const q = (filter || '').trim().toLowerCase();
-  const remaining = PARTICIPANTS.filter(p => !checkins[p.code.toUpperCase()])
-    .filter(p => !q || p.name.toLowerCase().includes(q) || (p.alias||'').toLowerCase().includes(q));
+  const remaining = ALL_PARTICIPANTS.filter(p => !checkins[p.passId.toUpperCase()])
+    .filter(p => !q || p.name.toLowerCase().includes(q) || (p.email||'').toLowerCase().includes(q));
   if(remaining.length === 0){
     pendingList.innerHTML = `<div class="empty-state">${q ? 'No matches' : 'Everyone has checked in 🎉'}</div>`;
   } else {
@@ -487,9 +571,9 @@ function renderPending(filter){
       <div class="log-item">
         <div>
           <div class="log-name">${escapeHtml(p.name)}</div>
-          <div class="log-meta">${escapeHtml(p.course || '')}${p.alias ? ' · "'+escapeHtml(p.alias)+'"' : ''}</div>
+          <div class="log-meta">${escapeHtml(p.passType || '')}${p.email ? ' · '+escapeHtml(p.email) : ''}</div>
         </div>
-        <div class="log-time">${p.code}</div>
+        <div class="log-time">${p.passId}</div>
       </div>
     `).join('');
   }
@@ -499,20 +583,56 @@ function escapeHtml(s){
   return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+// Normalizes a pass ID for matching: strips dashes/spaces/punctuation,
+// uppercases, and drops a leading "RMP" prefix if present — so
+// "RMP-4622-FFBE", "4622FFBE", and "rmp 4622 ffbe" all match.
+function normalizeCode(s){
+  let v = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if(v.startsWith('RMP')) v = v.slice(3);
+  return v;
+}
+
 async function handleCode(raw){
-  const code = String(raw || '').trim().toUpperCase();
+  const rawText = String(raw || '').trim();
+  if(!rawText) return;
+
+  // QR codes generated by the Entry Pass Generator contain the full
+  // participant data as JSON. Older/plain-code QR codes are still supported.
+  let qrData = null;
+  try {
+    const parsed = JSON.parse(rawText);
+    if(parsed && parsed.type === 'RAMPAGE_ENTRY_PASS' && parsed.code){
+      qrData = parsed;
+    }
+  } catch(e) {}
+
+  const code = normalizeCode(qrData ? qrData.code : rawText);
   if(!code) return;
   const banner = document.getElementById('resultBanner');
   const icon = document.getElementById('resultIcon');
   const title = document.getElementById('resultTitle');
   const sub = document.getElementById('resultSub');
 
-  const person = byCode[code];
+  // Prefer the locally registered participant record. If the QR contains
+  // a valid Entry Pass payload but the code is not in the local list, use
+  // the participant data embedded in the QR and add it to this scanner's list.
+  let person = byCode[code];
+  if(!person && qrData){
+    person = {
+      name: String(qrData.name || 'Guest').trim(),
+      passId: code,
+      passType: qrData.passType || '',
+      phone: qrData.phone || '',
+      email: qrData.email || ''
+    };
+    ALL_PARTICIPANTS.push(person);
+    rebuildIndex();
+  }
 
   if(!person){
     banner.className = 'result-banner fail';
     icon.textContent = '✕';
-    title.textContent = 'Invalid code — not on the list';
+    title.textContent = 'Invalid QR / code';
     sub.textContent = `Scanned: ${code}`;
     flags.push({code, reason:'Unregistered / invalid code scanned', time: Date.now()});
     await saveFlags();
@@ -534,12 +654,13 @@ async function handleCode(raw){
   banner.className = 'result-banner ok';
   icon.textContent = '✓';
   title.textContent = `Welcome, ${person.name}`;
-  sub.textContent = `${person.course || ''}${person.alias ? ' · "'+person.alias+'"' : ''} — entry granted`;
+  sub.textContent = `${person.passType || ''}${person.email ? ' · '+person.email : ''} — entry granted`;
 
   await saveCheckin(code, {
     name: person.name,
-    course: person.course,
-    alias: person.alias,
+    passType: person.passType,
+    phone: person.phone,
+    email: person.email,
     time: Date.now()
   });
   renderAll();
@@ -569,9 +690,9 @@ document.getElementById('manualInput').addEventListener('keydown', (e) => {
 
 // Export CSV
 document.getElementById('exportBtn').addEventListener('click', () => {
-  let csv = 'name,course,alias,code,time\n';
+  let csv = 'name,passType,phone,email,passId,time\n';
   Object.entries(checkins).sort((a,b)=>a[1].time-b[1].time).forEach(([code, r]) => {
-    const row = [r.name, r.course||'', r.alias||'', code, new Date(r.time).toISOString()]
+    const row = [r.name, r.passType||'', r.phone||'', r.email||'', code, new Date(r.time).toISOString()]
       .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
     csv += row + '\n';
   });
@@ -588,44 +709,273 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 
 // Reset
 document.getElementById('resetBtn').addEventListener('click', async () => {
-  if(!confirm('Clear ALL check-in data for everyone? This cannot be undone.')) return;
+  if(!confirm('Clear ALL check-in data AND any guests added on this device (restoring the original list)? This cannot be undone.')) return;
   for(const code of Object.keys(checkins)){
     try{ await storage.delete(STORE_PREFIX + code); }catch(e){}
   }
+  try{
+    const res = await storage.list(GUEST_PREFIX);
+    if(res && res.keys && res.keys.length){
+      for(const k of res.keys){
+        try{ await storage.delete(k); }catch(e){}
+      }
+    }
+  }catch(e){}
   checkins = {};
   flags = [];
+  ALL_PARTICIPANTS = BASE_PARTICIPANTS.slice();
+  rebuildIndex();
   await saveFlags();
   renderAll();
 });
 
+// Add guest
+function genCode(){
+  const chars = '0123456789ABCDEF';
+  const block = () => Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  let code;
+  do{
+    code = `RMP-${block()}-${block()}`;
+  } while(byCode[normalizeCode(code)]);
+  return code;
+}
+
+let lastQrCanvas = null;
+
+document.getElementById('addGuestBtn').addEventListener('click', async () => {
+  const name = document.getElementById('newName').value.trim();
+  const passType = document.getElementById('newPassType').value.trim();
+  const phone = document.getElementById('newPhone').value.trim();
+  const email = document.getElementById('newEmail').value.trim();
+  const manualCode = document.getElementById('newPassId').value.trim().toUpperCase();
+  if(!name){ alert('Name is required.'); return; }
+
+  let code;
+  if(manualCode){
+    if(byCode[normalizeCode(manualCode)]){
+      alert(`Pass ID ${manualCode} is already assigned to ${byCode[normalizeCode(manualCode)].name}. Use a different pass ID, or leave the field blank to auto-generate one.`);
+      return;
+    }
+    code = manualCode;
+  } else {
+    code = genCode();
+  }
+
+  const guest = { name, passType, phone, email, passId: code };
+
+  try{
+    await storage.set(GUEST_PREFIX + code, JSON.stringify(guest));
+  }catch(e){
+    alert('Could not save guest — please try again.');
+    return;
+  }
+
+  ALL_PARTICIPANTS.push(guest);
+  rebuildIndex();
+  renderAll();
+
+  document.getElementById('newName').value = '';
+  document.getElementById('newPassType').value = '';
+  document.getElementById('newPhone').value = '';
+  document.getElementById('newEmail').value = '';
+  document.getElementById('newPassId').value = '';
+
+  document.getElementById('newGuestResult').style.display = 'block';
+  document.getElementById('newGuestName').textContent = name;
+  document.getElementById('newGuestCode').textContent = code;
+
+  const holder = document.getElementById('qrCanvasHolder');
+  holder.innerHTML = '';
+  const qrPayload = JSON.stringify({
+    type: "RAMPAGE_ENTRY_PASS",
+    version: 1,
+    name,
+    code,
+    passType,
+    phone,
+    email,
+    event: "The Fresher Night — Lucknow University"
+  });
+  new QRCode(holder, { text: qrPayload, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+  setTimeout(() => { lastQrCanvas = holder.querySelector('canvas'); }, 50);
+});
+
+document.getElementById('downloadQrBtn').addEventListener('click', () => {
+  const canvas = document.getElementById('qrCanvasHolder').querySelector('canvas');
+  if(!canvas) return;
+  const name = document.getElementById('newGuestName').textContent.replace(/[^a-z0-9]/gi,'_');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `qr-${name}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
 // Camera scanner
 let scannerRunning = false;
+
+function detectInAppBrowser(){
+  const ua = navigator.userAgent || '';
+  // Common in-app webviews that block or cripple camera (getUserMedia) access.
+  if(/\bFBAN|\bFBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(ua)) return 'generic';
+  if(/\bwv\b/.test(ua) && /Version\/[\d.]+.*Chrome/i.test(ua)) return 'generic'; // Android WebView signature
+  // WhatsApp's own in-app browser doesn't always add a distinct UA token,
+  // so we also flag any Android WebView-style UA missing a real browser suffix.
+  if(/Android/i.test(ua) && !/Chrome\/|Firefox\/|SamsungBrowser\//i.test(ua)) return 'generic';
+  return null;
+}
+
+function showBrowserWarning(html){
+  const el = document.getElementById('browserWarning');
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+function buildOpenInBrowserBanner(){
+  const url = window.location.href;
+  return `
+    <div class="warn-banner">
+      <strong>⚠ Camera may be blocked in this app</strong>
+      This page looks like it's open inside an app's built-in browser (e.g. WhatsApp, Instagram), which often blocks camera access entirely. Please open this link in Chrome or Safari instead — tap the "···" or share icon at the top/bottom of this screen and choose <b>Open in Browser</b>.
+      <div class="copy-link-row">
+        <input type="text" readonly value="${escapeHtml(url)}" id="warnUrlInput" />
+        <button id="warnCopyBtn">Copy link</button>
+      </div>
+    </div>`;
+}
+
 function startScanner(){
   const readerEl = document.getElementById('reader');
-  const html5QrCode = new Html5Qrcode('reader');
-  let lastScan = 0;
-  html5QrCode.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 240, height: 240 } },
-    (decodedText) => {
-      const now = Date.now();
-      if(now - lastScan < 1500) return; // debounce rapid repeat frames
-      lastScan = now;
-      handleCode(decodedText);
-    },
-    (errorMessage) => { /* ignore per-frame scan misses */ }
-  ).then(() => { scannerRunning = true; })
-  .catch((err) => {
+
+  // 0. This page cannot access the camera at all when opened as a local
+  // file (file:// — e.g. double-clicked from Downloads, or a file:/// URL
+  // in the address bar). Browsers block camera access on file:// pages
+  // with no visible error, which is why the box just stays blank forever.
+  if(window.location.protocol === 'file:'){
     readerEl.innerHTML = `
       <div class="cam-off">
-        <div>Couldn't access the camera.<br/>Check permissions, or use manual entry below.</div>
+        <div><b>Can't use the camera from a local file.</b><br/>This page needs to be hosted (e.g. uploaded to a web host, or run through a local server) so it loads as http:// or https:// — then the camera will work.<br/><br/>Manual entry below still works right now.</div>
+      </div>`;
+    return;
+  }
+
+  // 1. Camera requires a secure context (HTTPS or localhost).
+  if(!window.isSecureContext){
+    readerEl.innerHTML = `
+      <div class="cam-off">
+        <div>Camera access needs a secure (https://) connection.<br/>Please open this page over HTTPS, or use manual entry below.</div>
+      </div>`;
+    return;
+  }
+
+  // 2. The scanning library must have actually loaded (CDN can be blocked
+  // by some networks/in-app browsers, or by content blockers).
+  if(typeof Html5Qrcode === 'undefined'){
+    readerEl.innerHTML = `
+      <div class="cam-off">
+        <div>The scanner couldn't load (a required script was blocked).<br/>Try opening this page in Chrome or Safari, or use manual entry below.</div>
         <button id="retryCam">Try again</button>
       </div>`;
     document.getElementById('retryCam').addEventListener('click', startScanner);
+    return;
+  }
+
+  // 3. Warn early if we're likely inside an in-app browser known to
+  // restrict camera access, before even attempting to start it.
+  if(detectInAppBrowser()){
+    showBrowserWarning(buildOpenInBrowserBanner());
+    const copyBtn = document.getElementById('warnCopyBtn');
+    if(copyBtn){
+      copyBtn.addEventListener('click', () => {
+        const input = document.getElementById('warnUrlInput');
+        input.select();
+        try{ document.execCommand('copy'); }catch(e){}
+        if(navigator.clipboard){ navigator.clipboard.writeText(input.value).catch(()=>{}); }
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
+      });
+    }
+  }
+
+  const html5QrCode = new Html5Qrcode('reader');
+  let lastScan = 0;
+
+  const onSuccess = (decodedText) => {
+    const now = Date.now();
+    if(now - lastScan < 1500) return; // debounce rapid repeat frames
+    lastScan = now;
+    handleCode(decodedText);
+  };
+  const onScanFailure = () => { /* ignore per-frame scan misses */ };
+
+  const showCamError = (err) => {
+    const name = (err && err.name) ? err.name : '';
+    let msg = "Couldn't access the camera.";
+    if(name === 'NotAllowedError' || /Permission/i.test(String(err))){
+      msg = 'Camera permission was denied. Check your browser/site settings and allow camera access, then retry.';
+    } else if(name === 'NotFoundError' || /no camera/i.test(String(err))){
+      msg = 'No camera was found on this device.';
+    } else if(name === 'NotReadableError'){
+      msg = 'The camera is already in use by another app. Close other apps using the camera and retry.';
+    } else if(detectInAppBrowser()){
+      msg = "Camera access is blocked in this in-app browser. Open this page in Chrome or Safari instead.";
+    }
+    readerEl.innerHTML = `
+      <div class="cam-off">
+        <div>${msg}<br/>You can also use manual entry below.</div>
+        <button id="retryCam">Try again</button>
+      </div>`;
+    document.getElementById('retryCam').addEventListener('click', startScanner);
+  };
+
+  // Prefer the back camera; fall back to any available camera if the
+  // environment-facing constraint isn't supported on this device/browser.
+  let settled = false;
+  const watchdog = setTimeout(() => {
+    if(!settled){
+      settled = true;
+      showCamError(new Error('Camera did not respond in time.'));
+    }
+  }, 8000);
+
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    onSuccess,
+    onScanFailure
+  ).then(() => {
+    settled = true;
+    clearTimeout(watchdog);
+    scannerRunning = true;
+  })
+  .catch((err) => {
+    Html5Qrcode.getCameras().then(devices => {
+      if(devices && devices.length){
+        html5QrCode.start(
+          devices[0].id,
+          { fps: 10, qrbox: { width: 240, height: 240 } },
+          onSuccess,
+          onScanFailure
+        ).then(() => {
+          settled = true;
+          clearTimeout(watchdog);
+          scannerRunning = true;
+        })
+        .catch((e2) => {
+          if(!settled){ settled = true; clearTimeout(watchdog); showCamError(e2); }
+        });
+      } else {
+        if(!settled){ settled = true; clearTimeout(watchdog); showCamError(err); }
+      }
+    }).catch(() => {
+      if(!settled){ settled = true; clearTimeout(watchdog); showCamError(err); }
+    });
   });
 }
 
 (async () => {
+  await loadGuests();
   await loadState();
   startScanner();
 })();
