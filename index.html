@@ -584,6 +584,9 @@ const FLAG_KEY = 'flags-log';
 
 async function loadGuests(){
   try{
+    // Remove the previously stored Varun Dev Dikhit guest so he does not
+    // reappear in the Not Arrived list from this browser's localStorage.
+    await storage.delete(GUEST_PREFIX + 'RMP-A01-6AC39');
     const res = await storage.list(GUEST_PREFIX);
     if(res && res.keys && res.keys.length){
       for(const k of res.keys){
